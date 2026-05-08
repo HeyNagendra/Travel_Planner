@@ -4,6 +4,9 @@ import fs from "fs";
 import path from "path";
 import { GoogleGenAI } from "@google/genai";
 import dotenv from "dotenv";
+import helmet from "helmet";
+import rateLimit from "express-rate-limit";
+import compression from "compression";
 
 // Load env vars
 dotenv.config();
@@ -21,11 +24,34 @@ function getAIClient() {
   return new GoogleGenAI({ apiKey: apiKey || "" });
 }
 
+const apiLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many requests, please try again later." },
+});
+
 async function startServer() {
   const app = express();
   const PORT = 3000;
 
-  app.use(express.json());
+  app.use(helmet({
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'self'", "'unsafe-inline'", "maps.googleapis.com", "maps.gstatic.com"],
+        styleSrc: ["'self'", "'unsafe-inline'", "fonts.googleapis.com"],
+        fontSrc: ["'self'", "fonts.gstatic.com"],
+        imgSrc: ["'self'", "data:", "maps.googleapis.com", "maps.gstatic.com", "*.google.com", "*.googleapis.com", "i.ytimg.com", "img.youtube.com"],
+        connectSrc: ["'self'", "maps.googleapis.com", "www.googleapis.com"],
+        frameSrc: ["'none'"],
+      },
+    },
+  }));
+  app.use(compression());
+  app.use(express.json({ limit: "50kb" }));
+  app.use("/api/", apiLimiter);
 
   // API Routes
   app.get("/api/config", (req, res) => {
@@ -66,14 +92,15 @@ async function startServer() {
   app.post("/api/chat", async (req, res) => {
     const { message, history } = req.body;
     
-    if (!message) {
+    if (!message || typeof message !== "string" || !message.trim()) {
       return res.status(400).json({ error: "Message is required" });
     }
+    const sanitizedMessage = message.slice(0, 10000);
 
     try {
       // Format history for generateContent
       // history is usually [{role: 'user', parts: [{text: '...'}]}, ...]
-      const contents = history ? [...history, { role: 'user', parts: [{ text: message }] }] : [{ role: 'user', parts: [{ text: message }] }];
+      const contents = history ? [...history, { role: 'user', parts: [{ text: sanitizedMessage }] }] : [{ role: 'user', parts: [{ text: sanitizedMessage }] }];
 
       const client = getAIClient();
       const response = await client.models.generateContent({

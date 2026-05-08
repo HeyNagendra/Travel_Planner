@@ -53,6 +53,7 @@ export default function PlaceActionsPanel({ place, initialTab, onClose, isDarkMo
     return raw || p.name || '';
   };
 
+  const placeId = place.id || place.name;
   const [placeName, setPlaceName] = useState(() => resolveName(place) || place.id || 'Loading…');
   const [placeAddress, setPlaceAddress] = useState(place.formattedAddress || place.vicinity || '');
 
@@ -76,7 +77,6 @@ export default function PlaceActionsPanel({ place, initialTab, onClose, isDarkMo
       setPlaceName(place.id || 'Unknown Place');
     }
   }, [placeId]);
-  const placeId = place.id || place.name;
 
   const fetchVideos = useCallback(async () => {
     setLoadingVideos(true);
@@ -376,10 +376,11 @@ export default function PlaceActionsPanel({ place, initialTab, onClose, isDarkMo
             >
               {/* Date picker */}
               <div>
-                <label className="block text-[10px] uppercase tracking-widest font-bold text-slate-400 dark:text-slate-500 mb-1.5">
+                <label htmlFor="visit-date" className="block text-[10px] uppercase tracking-widest font-bold text-slate-400 dark:text-slate-500 mb-1.5">
                   Visit Date
                 </label>
                 <input
+                  id="visit-date"
                   type="date"
                   value={visitDate}
                   onChange={(e) => setVisitDate(e.target.value)}
@@ -438,10 +439,11 @@ export default function PlaceActionsPanel({ place, initialTab, onClose, isDarkMo
 
               {/* Notes */}
               <div>
-                <label className="block text-[10px] uppercase tracking-widest font-bold text-slate-400 dark:text-slate-500 mb-1.5">
+                <label htmlFor="visit-notes" className="block text-[10px] uppercase tracking-widest font-bold text-slate-400 dark:text-slate-500 mb-1.5">
                   Notes <span className="normal-case font-normal">(optional)</span>
                 </label>
                 <textarea
+                  id="visit-notes"
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
                   placeholder={`What are you planning to do at ${placeName.split(',')[0]}?`}

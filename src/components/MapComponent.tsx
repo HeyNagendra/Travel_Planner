@@ -206,10 +206,12 @@ const PlacesSearch = ({
       </button>
 
       {/* Sidebar for Search Results - Absolute positioned over map */}
-      <motion.div 
+      <motion.div
+        role="complementary"
+        aria-label="Place search and itinerary"
         initial={{ x: -400, opacity: 0 }}
-        animate={{ 
-          x: isStreetViewActive ? -400 : (isSidebarOpen ? 0 : -400), 
+        animate={{
+          x: isStreetViewActive ? -400 : (isSidebarOpen ? 0 : -400),
           opacity: isStreetViewActive ? 0 : 1,
           pointerEvents: isStreetViewActive ? 'none' : 'auto'
         }}
@@ -565,9 +567,10 @@ const MapMarkers = ({
                 <button
                   onClick={onShowVlogs}
                   className="flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl font-bold text-xs transition-all bg-rose-500 hover:bg-rose-600 active:scale-95 text-white shadow-md shadow-rose-200/50 dark:shadow-none"
+                  aria-label="Watch travel vlogs for this place"
                   title="Watch travel vlogs"
                 >
-                  <Youtube className="w-3.5 h-3.5" />
+                  <Youtube className="w-3.5 h-3.5" aria-hidden="true" />
                   Vlogs
                 </button>
 
@@ -575,9 +578,10 @@ const MapMarkers = ({
                 <button
                   onClick={onShowCalendar}
                   className="flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl font-bold text-xs transition-all bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white shadow-md shadow-indigo-200/50 dark:shadow-none"
+                  aria-label="Plan your visit to this place"
                   title="Plan your visit"
                 >
-                  <CalendarDays className="w-3.5 h-3.5" />
+                  <CalendarDays className="w-3.5 h-3.5" aria-hidden="true" />
                   Plan
                 </button>
               </div>
