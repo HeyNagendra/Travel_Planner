@@ -1,0 +1,277 @@
+@import "tailwindcss";
+
+/* Force Tailwind to use the .dark class for the dark: variant instead of system preference */
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+  
+  /* Vibrant Electric Indigo Palette */
+  --color-indigo-50: #f4f5ff;
+  --color-indigo-100: #e9ebff;
+  --color-indigo-200: #d2d6ff;
+  --color-indigo-300: #adb5ff;
+  --color-indigo-400: #838cff;
+  --color-indigo-500: #5d5cff; /* More electric */
+  --color-indigo-600: #4a42ff;
+  --color-indigo-700: #3b30e6;
+  --color-indigo-800: #2f27bc;
+  --color-indigo-900: #2a2595;
+  --color-indigo-950: #181658;
+
+  /* Vibrant Rose/Pink for accents */
+  --color-rose-500: #f43f5e;
+  --color-rose-600: #e11d48;
+  
+  /* Vibrant Amber for saved items */
+  --color-amber-400: #fbbf24;
+  --color-amber-500: #f59e0b;
+}
+
+@layer base {
+  body {
+    @apply antialiased text-slate-900 bg-white;
+  }
+}
+
+/* Custom Scrollbar Utility */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  @apply bg-transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  @apply bg-slate-200 dark:bg-slate-700 rounded-full;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  @apply bg-slate-300 dark:bg-slate-600;
+}
+
+.gm-style-iw-chr {
+  height: 0 !important;
+}
+
+/* Places UI Kit MD3 Tokens & Theming - Expert Level Customization */
+:root {
+  color-scheme: light !important;
+  /* Core Colors */
+  --gmp-mat-color-primary: #5d5cff;
+  --gmp-mat-color-on-primary: #ffffff;
+  --gmp-mat-color-secondary: #4a42ff;
+  --gmp-mat-color-on-secondary: #ffffff;
+  --gmp-mat-color-surface: #ffffff;
+  --gmp-mat-color-on-surface: #0f172a !important;
+  --gmp-mat-color-surface-container: #ffffff;
+  --gmp-mat-color-surface-container-low: #f8fafc;
+  --gmp-mat-color-outline: #e2e8f0;
+  --gmp-mat-color-outline-variant: #f1f5f9;
+  --gmp-mat-color-secondary-container: #e9ebff;
+  --gmp-mat-color-on-secondary-container: #4a42ff;
+  --gmp-mat-color-on-surface-variant: #64748b;
+  --gmp-mat-color-positive: #10b981;
+  --gmp-mat-color-negative: #ef4444;
+  --gmp-internal-attribution-color: #0f172a !important;
+  
+  /* Typography */
+  --gmp-mat-font-family: "Inter", ui-sans-serif, system-ui, sans-serif;
+  
+  /* Shapes */
+  --gmp-mat-shape-corner-extra-large: 24px;
+  --gmp-mat-shape-corner-large: 16px;
+  --gmp-mat-shape-corner-medium: 12px;
+  --gmp-mat-shape-corner-small: 8px;
+}
+
+.dark {
+  color-scheme: dark !important;
+  --gmp-mat-color-primary: #838cff;
+  --gmp-mat-color-on-primary: #ffffff;
+  --gmp-mat-color-secondary: #adb5ff;
+  --gmp-mat-color-on-secondary: #181658;
+  --gmp-mat-color-surface: #0f172a;
+  --gmp-mat-color-on-surface: #f1f5f9 !important;
+  --gmp-mat-color-surface-container: #0f172a;
+  --gmp-mat-color-surface-container-low: #1e293b;
+  --gmp-mat-color-outline: #1e293b;
+  --gmp-mat-color-outline-variant: #334155;
+  --gmp-mat-color-secondary-container: #181658;
+  --gmp-mat-color-on-secondary-container: #d2d6ff;
+  --gmp-mat-color-on-surface-variant: #94a3b8;
+  --gmp-mat-color-positive: #34d399;
+  --gmp-mat-color-negative: #f87171;
+  --gmp-internal-attribution-color: #f1f5f9 !important;
+}
+
+/* Advanced Part Styling for Places UI Kit */
+gmp-place-details-compact::part(container),
+gmp-place-details::part(container) {
+  padding: 0;
+  border: none;
+  background: transparent;
+}
+
+/* Style the images in the UI Kit to match our rounded theme */
+gmp-place-details-compact::part(image),
+gmp-place-details::part(image) {
+  border-radius: 12px;
+  object-fit: cover;
+}
+
+/* Refine the typography inside the components */
+gmp-place-details-compact::part(title),
+gmp-place-details::part(title) {
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--gmp-mat-color-on-surface);
+}
+
+/* Custom styling for the saved list items to ensure horizontal layout */
+.saved-list-item {
+  --gmp-mat-color-surface-container: transparent;
+  display: block;
+  width: 90%;
+}
+
+.saved-list-item::part(container) {
+  padding: 8px !important;
+  border: none !important;
+  background: transparent !important;
+  min-width: 0 !important;
+  width: 100% !important;
+}
+
+.saved-list-item::part(image) {
+  width: 80px !important;
+  height: 80px !important;
+  border-radius: 12px !important;
+  flex-shrink: 0 !important;
+  object-fit: cover !important;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+/* Refine the typography inside the components */
+.saved-list-item::part(title) {
+  font-weight: 700 !important;
+  font-size: 0.95rem !important;
+  letter-spacing: -0.01em !important;
+  margin-bottom: 4px !important;
+  color: var(--gmp-mat-color-on-surface);
+}
+
+.saved-list-item::part(address) {
+  font-size: 0.75rem !important;
+  opacity: 0.7;
+}
+
+/* Hide extra info in the saved list to keep it compact */
+.saved-list-item::part(reviews),
+.saved-list-item::part(actions),
+.saved-list-item::part(contact) {
+  display: none !important;
+}
+
+/* InfoWindow Compact Styling */
+.info-window-compact {
+  --gmp-mat-color-surface-container: transparent;
+  display: block;
+  border-radius: 0;
+}
+
+.info-window-compact::part(container) {
+  padding: 16px !important;
+  border: none !important;
+}
+
+/* Ensure search list is clean */
+gmp-place-search {
+  height: 100%;
+  --gmp-mat-shape-corner-extra-large: 0px;
+  --gmp-mat-shape-corner-large: 0px;
+  --gmp-mat-shape-corner-medium: 0px;
+  --gmp-mat-shape-corner-small: 0px;
+  background: transparent;
+}
+
+/* InfoWindow Dark Mode Fixes */
+.gm-style-iw-c {
+  padding: 0 !important;
+  border-radius: 16px !important;
+}
+
+.gm-style-iw-d {
+  max-width: 320px !important;
+  padding: 0 !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+}
+
+.dark .gm-style-iw-c {
+  background-color: #0f172a !important;
+  border: 1px solid #1e293b !important;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.6) !important;
+}
+
+.dark .gm-style-iw-d {
+  background-color: #0f172a !important;
+  color: #f1f5f9 !important;
+}
+
+/* InfoWindow Close Button Fixes */
+.gm-ui-hover-effect {
+  top: 8px !important;
+  right: 8px !important;
+  background: #5d5cff !important; /* Theme Indigo */
+  border-radius: 50% !important;
+  width: 28px !important;
+  height: 28px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  z-index: 1000 !important;
+  box-shadow: 0 4px 12px rgba(93, 92, 255, 0.3) !important;
+  opacity: 1 !important;
+  transition: all 0.2s ease !important;
+}
+
+.gm-ui-hover-effect:hover {
+  background: #4a42ff !important;
+  transform: scale(1.1);
+  box-shadow: 0 6px 16px rgba(93, 92, 255, 0.4) !important;
+}
+
+/* Make the 'X' icon white */
+.gm-ui-hover-effect > span {
+  margin: 0 !important;
+  filter: invert(1) brightness(10) !important;
+}
+
+.dark .gm-ui-hover-effect {
+  background: #838cff !important; /* Lighter indigo for dark mode visibility */
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5) !important;
+}
+
+.dark .gm-ui-hover-effect:hover {
+  background: #adb5ff !important;
+}
+
+.dark .gm-ui-hover-effect > span {
+  filter: invert(1) brightness(10) !important;
+}
+
+/* InfoWindow Tip (the triangle at the bottom) */
+.dark .gm-style-iw-tc::after {
+  background-color: #0f172a !important;
+}
+
+/* Override Google Maps Attribution Logo Color */
+.attribution__logo--default path,
+.gm-style-cc path,
+.gmp-attribution path,
+[class*="attribution"] path {
+  fill: var(--gmp-internal-attribution-color) !important;
+}
