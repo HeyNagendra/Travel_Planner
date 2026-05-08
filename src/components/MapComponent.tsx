@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { APIProvider, Map as GoogleMap, AdvancedMarker, useMap, useMapsLibrary, InfoWindow } from '@vis.gl/react-google-maps';
 import { motion, AnimatePresence } from 'motion/react';
-import { Loader2, MapPin, Info, Star, Trash2, Search, Calendar, Moon, Sun, Menu, X, Youtube, CalendarDays } from 'lucide-react';
+import { Loader2, MapPin, Info, Star, Trash2, Search, Calendar, Moon, Sun, Menu, X, Youtube, CalendarDays, Route, Sparkles } from 'lucide-react';
 import PlaceActionsPanel from './PlaceActionsPanel';
 
 interface MapComponentProps {
@@ -361,12 +361,12 @@ const PlacesSearch = ({
           {/* Saved Tab Content */}
           <div className={`flex-1 overflow-y-auto custom-scrollbar p-4 space-y-4 ${activeTab !== 'saved' ? 'hidden' : ''}`}>
             {itinerary.length === 0 ? (
-              <motion.div 
+              <motion.div
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 className="text-center py-12 px-4"
               >
-                <div className="w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-3 bg-slate-100 dark:bg-slate-800">
+                <div className="w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-3 bg-slate-100 dark:bg-slate-800" aria-hidden="true">
                   <Star className="w-6 h-6 text-slate-400 dark:text-slate-600" />
                 </div>
                 <p className="text-sm text-slate-500 dark:text-slate-400 font-medium">Your saved list is empty.</p>
@@ -426,6 +426,50 @@ const PlacesSearch = ({
                   </motion.div>
                 ))}
               </AnimatePresence>
+            )}
+
+            {/* Route + Itinerary actions (shown when 2+ places saved) */}
+            {itinerary.length >= 2 && (
+              <motion.div
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="space-y-2 pt-2 border-t border-slate-100 dark:border-slate-800"
+              >
+                <button
+                  onClick={() => {
+                    const waypoints = itinerary.map(p =>
+                      p.location
+                        ? `${p.location.lat},${p.location.lng}`
+                        : encodeURIComponent(typeof p.displayName === 'object' ? p.displayName.text : p.displayName || '')
+                    ).join('/');
+                    window.open(`https://www.google.com/maps/dir/${waypoints}`, '_blank', 'noopener,noreferrer');
+                  }}
+                  className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-bold border border-indigo-200 dark:border-indigo-800 bg-indigo-50 dark:bg-indigo-950/30 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100 dark:hover:bg-indigo-950/60 transition-all active:scale-[0.98]"
+                  aria-label="Open multi-stop route in Google Maps"
+                >
+                  <Route className="w-3.5 h-3.5" aria-hidden="true" />
+                  Open Route in Google Maps
+                </button>
+                <button
+                  onClick={() => {
+                    const placeNames = itinerary.map(p =>
+                      typeof p.displayName === 'object' ? p.displayName.text : (p.displayName || p.id || 'Unknown')
+                    ).join(', ');
+                    window.dispatchEvent(new CustomEvent('trigger-chat', {
+                      detail: {
+                        message: `Generate a detailed day-by-day travel itinerary for a trip visiting these places: ${placeNames}. Include best times to visit, estimated duration at each place, what to see and do, and practical travel tips between stops.`
+                      }
+                    }));
+                    if (window.innerWidth < 640) setIsSidebarOpen(false);
+                  }}
+                  className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-bold text-white transition-all active:scale-[0.98] shadow-md shadow-indigo-200/50 dark:shadow-none"
+                  style={{ background: 'linear-gradient(135deg, #4a42ff 0%, #7c3aed 100%)' }}
+                  aria-label="Generate AI trip itinerary for saved places"
+                >
+                  <Sparkles className="w-3.5 h-3.5" aria-hidden="true" />
+                  Generate AI Trip Plan
+                </button>
+              </motion.div>
             )}
           </div>
         </div>

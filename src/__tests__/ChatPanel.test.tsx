@@ -200,4 +200,60 @@ describe('ChatPanel', () => {
     const input = screen.getByPlaceholderText(/type your message/i);
     expect(input).toBeInTheDocument();
   });
+
+  // ─── trigger-chat custom event ─────────────────────────────────────────────
+
+  it('opens and sends message when trigger-chat event fires', async () => {
+    const mockFetch = vi.mocked(global.fetch);
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ text: 'Here is your itinerary!' }),
+    } as Response);
+
+    render(<ChatPanel />);
+
+    window.dispatchEvent(new CustomEvent('trigger-chat', {
+      detail: { message: 'Generate an itinerary for Paris' },
+    }));
+
+    await waitFor(() => {
+      expect(screen.getByText('Generate an itinerary for Paris')).toBeInTheDocument();
+    });
+    expect(screen.getByRole('heading', { name: /travel assistant/i })).toBeInTheDocument();
+  });
+
+  // ─── Translation ───────────────────────────────────────────────────────────
+
+  it('shows language selector in the header', async () => {
+    render(<ChatPanel />);
+    await userEvent.click(screen.getByRole('button', { name: /toggle chat/i }));
+    const select = screen.getByRole('combobox', { name: /select language for translation/i });
+    expect(select).toBeInTheDocument();
+  });
+
+  it('shows translate button on AI messages when language is selected', async () => {
+    const mockFetch = vi.mocked(global.fetch);
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ text: 'Paris is beautiful!' }),
+    } as Response);
+
+    render(<ChatPanel />);
+    await userEvent.click(screen.getByRole('button', { name: /toggle chat/i }));
+
+    const input = screen.getByPlaceholderText(/type your message/i);
+    await userEvent.type(input, 'Tell me about Paris');
+    fireEvent.submit(input.closest('form')!);
+
+    await waitFor(() => {
+      expect(screen.getByText('Paris is beautiful!')).toBeInTheDocument();
+    });
+
+    const langSelect = screen.getByRole('combobox', { name: /select language for translation/i });
+    await userEvent.selectOptions(langSelect, 'es');
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /translate to spanish/i })).toBeInTheDocument();
+    });
+  });
 });

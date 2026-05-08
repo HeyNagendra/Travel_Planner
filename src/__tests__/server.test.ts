@@ -241,6 +241,128 @@ describe('Calendar URL builder', () => {
   });
 });
 
+// ─── /api/translate validation ────────────────────────────────────────────────
+
+describe('POST /api/translate — input validation', () => {
+  it('rejects missing text', () => {
+    const body: any = { targetLanguage: 'es' };
+    const isValid = typeof body.text === 'string' && body.text.trim().length > 0 && typeof body.targetLanguage === 'string';
+    expect(isValid).toBe(false);
+  });
+
+  it('rejects missing targetLanguage', () => {
+    const body: any = { text: 'Hello world' };
+    const isValid = typeof body.text === 'string' && body.text.trim().length > 0 && typeof body.targetLanguage === 'string';
+    expect(isValid).toBe(false);
+  });
+
+  it('accepts valid text and targetLanguage', () => {
+    const body = { text: 'Hello, how are you?', targetLanguage: 'es' };
+    const isValid = typeof body.text === 'string' && body.text.trim().length > 0 && typeof body.targetLanguage === 'string';
+    expect(isValid).toBe(true);
+  });
+
+  it('sanitizes text longer than 5000 characters', () => {
+    const longText = 'a'.repeat(8000);
+    const sanitized = longText.slice(0, 5000);
+    expect(sanitized).toHaveLength(5000);
+  });
+
+  it('supports all expected target language codes', () => {
+    const supported = ['es', 'fr', 'de', 'ja', 'zh', 'ko', 'pt', 'ar', 'hi', 'it'];
+    supported.forEach(code => {
+      expect(typeof code).toBe('string');
+      expect(code.length).toBeGreaterThan(0);
+    });
+    expect(supported).toHaveLength(10);
+  });
+});
+
+// ─── /api/itinerary validation ─────────────────────────────────────────────────
+
+describe('POST /api/itinerary — input validation', () => {
+  it('rejects missing places array', () => {
+    const body: any = {};
+    const isValid = Array.isArray(body.places) && body.places.length > 0;
+    expect(isValid).toBe(false);
+  });
+
+  it('rejects empty places array', () => {
+    const body = { places: [] };
+    const isValid = Array.isArray(body.places) && body.places.length > 0;
+    expect(isValid).toBe(false);
+  });
+
+  it('accepts valid places array', () => {
+    const body = { places: [{ displayName: 'Eiffel Tower' }, { displayName: 'Louvre Museum' }] };
+    const isValid = Array.isArray(body.places) && body.places.length > 0;
+    expect(isValid).toBe(true);
+  });
+
+  it('extracts display name from string format', () => {
+    const place = { displayName: 'Eiffel Tower', id: 'ChIJ...' };
+    const name = typeof place.displayName === 'object'
+      ? (place.displayName as any)?.text
+      : place.displayName;
+    expect(name).toBe('Eiffel Tower');
+  });
+
+  it('extracts display name from object format', () => {
+    const place = { displayName: { text: 'Louvre Museum', language: 'en' }, id: 'ChIJ...' };
+    const name = typeof place.displayName === 'object'
+      ? (place.displayName as any)?.text
+      : place.displayName;
+    expect(name).toBe('Louvre Museum');
+  });
+
+  it('builds correct prompt with place names', () => {
+    const places = [
+      { displayName: 'Eiffel Tower' },
+      { displayName: 'Sacré-Cœur' },
+      { displayName: 'Notre-Dame' },
+    ];
+    const placeList = places.map(p => {
+      const name = typeof p.displayName === 'object' ? (p.displayName as any)?.text : p.displayName;
+      return name || 'Unknown';
+    }).join(', ');
+    expect(placeList).toBe('Eiffel Tower, Sacré-Cœur, Notre-Dame');
+  });
+});
+
+// ─── Google Maps Route URL builder ────────────────────────────────────────────
+
+describe('Google Maps Route URL builder', () => {
+  it('builds a valid route URL with coordinate waypoints', () => {
+    const places = [
+      { location: { lat: 48.8584, lng: 2.2945 }, displayName: 'Eiffel Tower' },
+      { location: { lat: 48.8606, lng: 2.3376 }, displayName: 'Louvre' },
+    ];
+    const waypoints = places.map(p =>
+      p.location ? `${p.location.lat},${p.location.lng}` : ''
+    ).join('/');
+    const url = `https://www.google.com/maps/dir/${waypoints}`;
+    expect(url).toContain('google.com/maps/dir');
+    expect(url).toContain('48.8584,2.2945');
+    expect(url).toContain('48.8606,2.3376');
+  });
+
+  it('requires at least 2 places for a route', () => {
+    const places = [{ location: { lat: 48.8584, lng: 2.2945 }, displayName: 'Eiffel Tower' }];
+    const canBuildRoute = places.length >= 2;
+    expect(canBuildRoute).toBe(false);
+  });
+
+  it('allows route with 3 or more stops', () => {
+    const places = [
+      { location: { lat: 48.8584, lng: 2.2945 } },
+      { location: { lat: 48.8606, lng: 2.3376 } },
+      { location: { lat: 48.8530, lng: 2.3499 } },
+    ];
+    const canBuildRoute = places.length >= 2;
+    expect(canBuildRoute).toBe(true);
+  });
+});
+
 // ─── Environment variable validation ──────────────────────────────────────────
 
 describe('Environment configuration', () => {

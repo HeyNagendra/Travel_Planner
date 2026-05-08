@@ -44,7 +44,7 @@ async function startServer() {
         styleSrc: ["'self'", "'unsafe-inline'", "fonts.googleapis.com"],
         fontSrc: ["'self'", "fonts.gstatic.com"],
         imgSrc: ["'self'", "data:", "maps.googleapis.com", "maps.gstatic.com", "*.google.com", "*.googleapis.com", "i.ytimg.com", "img.youtube.com"],
-        connectSrc: ["'self'", "maps.googleapis.com", "www.googleapis.com"],
+        connectSrc: ["'self'", "maps.googleapis.com", "www.googleapis.com", "translation.googleapis.com"],
         frameSrc: ["'none'"],
       },
     },
@@ -113,6 +113,85 @@ async function startServer() {
       console.error("AI Chat Error:", error);
       const message = error?.message || "Failed to get AI response";
       res.status(500).json({ error: message });
+    }
+  });
+
+  // POST /api/translate — Google Cloud Translation API with Gemini fallback
+  app.post("/api/translate", async (req, res) => {
+    const { text, targetLanguage } = req.body;
+    if (!text || typeof text !== "string" || !targetLanguage) {
+      return res.status(400).json({ error: "text and targetLanguage are required" });
+    }
+    const sanitized = text.slice(0, 5000);
+
+    // Try Google Cloud Translation API v2
+    const translateKey = process.env.GOOGLE_TRANSLATE_API_KEY;
+    if (translateKey) {
+      try {
+        const response = await fetch(
+          `https://translation.googleapis.com/language/translate/v2?key=${translateKey}`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ q: sanitized, target: targetLanguage, format: "text" }),
+          }
+        );
+        const data = await response.json();
+        const translated = data.data?.translations?.[0]?.translatedText;
+        if (translated) return res.json({ translatedText: translated, service: "google-translate" });
+      } catch (e) {
+        console.error("Cloud Translation error, falling back to Gemini:", e);
+      }
+    }
+
+    // Fallback: use Gemini AI for translation
+    try {
+      const client = getAIClient();
+      const prompt = `Translate the following text to ${targetLanguage}. Reply with ONLY the translated text, no commentary:\n\n${sanitized}`;
+      const response = await client.models.generateContent({
+        model: "gemini-3-flash-preview",
+        contents: [{ role: "user", parts: [{ text: prompt }] }],
+      });
+      res.json({ translatedText: response.text, service: "gemini" });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message || "Translation failed" });
+    }
+  });
+
+  // POST /api/itinerary — Gemini AI generates a day-by-day trip plan
+  app.post("/api/itinerary", async (req, res) => {
+    const { places } = req.body;
+    if (!places || !Array.isArray(places) || places.length === 0) {
+      return res.status(400).json({ error: "places array is required" });
+    }
+
+    const placeList = (places as any[])
+      .map((p) => {
+        const name = typeof p.displayName === "object" ? p.displayName?.text : p.displayName;
+        return name || p.id || "Unknown";
+      })
+      .join(", ");
+
+    const prompt = `You are an expert travel planner. Create a detailed, realistic day-by-day itinerary for a trip that visits: ${placeList}.
+
+Format your response with clear sections:
+- Start with a brief trip overview (2-3 sentences)
+- Organize visits into days (Day 1, Day 2, etc.)
+- For each place include: best time to visit, estimated duration, top things to do/see, and a quick practical tip
+- End with general tips (transport, food, budget)
+
+Keep it concise but practical. Use markdown formatting with headers and bullet points.`;
+
+    try {
+      const client = getAIClient();
+      const response = await client.models.generateContent({
+        model: "gemini-3-flash-preview",
+        contents: [{ role: "user", parts: [{ text: prompt }] }],
+      });
+      res.json({ itinerary: response.text });
+    } catch (error: any) {
+      console.error("Itinerary generation error:", error);
+      res.status(500).json({ error: error.message || "Failed to generate itinerary" });
     }
   });
 
