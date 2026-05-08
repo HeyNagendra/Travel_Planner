@@ -83,7 +83,7 @@ async function startServer() {
       const response = await fetch(url.toString());
       const data = await response.json();
       res.json(data);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("YouTube API Error:", error);
       res.status(500).json({ error: { message: "Failed to fetch YouTube videos" } });
     }
@@ -109,9 +109,9 @@ async function startServer() {
       });
 
       res.json({ text: response.text });
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("AI Chat Error:", error);
-      const message = error?.message || "Failed to get AI response";
+      const message = error instanceof Error ? error.message : "Failed to get AI response";
       res.status(500).json({ error: message });
     }
   });
@@ -153,8 +153,8 @@ async function startServer() {
         contents: [{ role: "user", parts: [{ text: prompt }] }],
       });
       res.json({ translatedText: response.text, service: "gemini" });
-    } catch (error: any) {
-      res.status(500).json({ error: error.message || "Translation failed" });
+    } catch (error: unknown) {
+      res.status(500).json({ error: error instanceof Error ? error.message : "Translation failed" });
     }
   });
 
@@ -165,7 +165,8 @@ async function startServer() {
       return res.status(400).json({ error: "places array is required" });
     }
 
-    const placeList = (places as any[])
+    interface PlaceInput { id?: string; displayName?: string | { text: string }; }
+    const placeList = (places as PlaceInput[])
       .map((p) => {
         const name = typeof p.displayName === "object" ? p.displayName?.text : p.displayName;
         return name || p.id || "Unknown";
@@ -189,9 +190,9 @@ Keep it concise but practical. Use markdown formatting with headers and bullet p
         contents: [{ role: "user", parts: [{ text: prompt }] }],
       });
       res.json({ itinerary: response.text });
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Itinerary generation error:", error);
-      res.status(500).json({ error: error.message || "Failed to generate itinerary" });
+      res.status(500).json({ error: error instanceof Error ? error.message : "Failed to generate itinerary" });
     }
   });
 
@@ -243,10 +244,24 @@ Keep it concise but practical. Use markdown formatting with headers and bullet p
   } else {
     // Serve static files from dist in production
     const distPath = path.resolve(process.cwd(), "dist");
-    app.use(express.static(distPath));
-    
+    app.use(
+      express.static(distPath, {
+        setHeaders: (res, filePath) => {
+          // Vite outputs hashed filenames under /assets/ — serve them with a
+          // 1-year immutable cache so returning visitors never re-download them.
+          if (/\/assets\/.*\.[a-f0-9]{8,}\./.test(filePath)) {
+            res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+          } else {
+            // HTML and other non-hashed files must always be re-validated.
+            res.setHeader("Cache-Control", "public, max-age=0, must-revalidate");
+          }
+        },
+      })
+    );
+
     // Handle SPA routing: serve index.html for all non-API routes
     app.get("*", (req, res) => {
+      res.setHeader("Cache-Control", "public, max-age=0, must-revalidate");
       res.sendFile(path.resolve(distPath, "index.html"));
     });
   }

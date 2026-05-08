@@ -4,6 +4,7 @@ import {
   X, Youtube, CalendarDays, Play, ExternalLink, Loader2,
   MapPin, Clock, FileDown, RefreshCw, Clapperboard, Sparkles,
 } from 'lucide-react';
+import type { GooglePlace } from '../types';
 
 interface VideoItem {
   id: { videoId: string };
@@ -17,7 +18,7 @@ interface VideoItem {
 }
 
 interface PlaceActionsPanelProps {
-  place: any;
+  place: GooglePlace;
   initialTab: 'vlogs' | 'calendar';
   onClose: () => void;
   isDarkMode: boolean;
@@ -48,7 +49,7 @@ export default function PlaceActionsPanel({ place, initialTab, onClose, isDarkMo
   const [notes, setNotes] = useState('');
   const [calendarSuccess, setCalendarSuccess] = useState(false);
 
-  const resolveName = (p: any): string => {
+  const resolveName = (p: GooglePlace): string => {
     const raw = typeof p.displayName === 'object' ? p.displayName?.text : p.displayName;
     return raw || p.name || '';
   };

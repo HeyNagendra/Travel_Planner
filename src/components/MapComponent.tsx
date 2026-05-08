@@ -1,8 +1,13 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback, memo } from 'react';
 import { APIProvider, Map as GoogleMap, AdvancedMarker, useMap, useMapsLibrary, InfoWindow } from '@vis.gl/react-google-maps';
 import { motion, AnimatePresence } from 'motion/react';
 import { Loader2, MapPin, Info, Star, Trash2, Search, Calendar, Moon, Sun, Menu, X, Youtube, CalendarDays, Route, Sparkles } from 'lucide-react';
 import PlaceActionsPanel from './PlaceActionsPanel';
+import type { GooglePlace, ItineraryItem } from '../types';
+
+/** Returns a stable string key for any place-like object. */
+const getPlaceKey = (p: GooglePlace | ItineraryItem): string =>
+  p.id ?? ('name' in p ? (p.name ?? '') : '');
 
 interface MapComponentProps {
   apiKey: string;
@@ -45,11 +50,31 @@ const POPULAR_CITIES = [
  * 2. Update handleLocationSearch to use google.maps.Geocoder.
  */
 
+/** Internal interface for gmp-place-search DOM element's custom properties */
+interface GmpPlaceSearchElement extends HTMLElement {
+  places?: GooglePlace[];
+}
+
+/** gmp-place-nearby-search-request DOM element properties */
+interface GmpNearbyRequestElement extends HTMLElement {
+  maxResultCount?: number;
+  locationRestriction?: {
+    center: google.maps.LatLng | google.maps.LatLngLiteral;
+    radius: number;
+  };
+  includedTypes?: string[];
+}
+
+/** Custom event fired by gmp-place-search on selection */
+interface GmpSelectEvent extends Event {
+  place: GooglePlace;
+}
+
 // Component to handle Places search using UI Kit
-const PlacesSearch = ({ 
-  itinerary, 
-  setItinerary, 
-  activeTab, 
+const PlacesSearch = memo(({
+  itinerary,
+  setItinerary,
+  activeTab,
   setActiveTab,
   places,
   setPlaces,
@@ -67,19 +92,19 @@ const PlacesSearch = ({
   isSidebarOpen,
   setIsSidebarOpen,
 }: {
-  itinerary: any[];
-  setItinerary: (itinerary: any[]) => void;
+  itinerary: ItineraryItem[];
+  setItinerary: (itinerary: ItineraryItem[]) => void;
   activeTab: 'search' | 'saved';
   setActiveTab: (tab: 'search' | 'saved') => void;
-  places: any[];
-  setPlaces: (places: any[]) => void;
-  selectedPlace: any | null;
-  setSelectedPlace: (place: any | null) => void;
+  places: GooglePlace[];
+  setPlaces: (places: GooglePlace[]) => void;
+  selectedPlace: GooglePlace | ItineraryItem | null;
+  setSelectedPlace: (place: GooglePlace | ItineraryItem | null) => void;
   selectedType: string;
   setSelectedType: (type: string) => void;
   removeFromItinerary: (placeId: string) => void;
   citySearch: string;
-  handleCitySelect: (map: any, cityName: string) => void;
+  handleCitySelect: (map: google.maps.Map | null, cityName: string) => void;
   isStreetViewActive: boolean;
   setIsStreetViewActive: (active: boolean) => void;
   isDarkMode: boolean;
@@ -107,31 +132,31 @@ const PlacesSearch = ({
     if (!map || !coreLib || !geometryLib || !placesLib || !placeSearchRef.current) return;
 
     // Create elements only if they don't exist
-    let placeSearch = placeSearchRef.current.querySelector('gmp-place-search');
-    let nearbyRequest: any;
+    let placeSearch = placeSearchRef.current.querySelector('gmp-place-search') as GmpPlaceSearchElement | null;
+    let nearbyRequest: GmpNearbyRequestElement | null = null;
 
     if (!placeSearch) {
-      placeSearch = document.createElement('gmp-place-search');
+      placeSearch = document.createElement('gmp-place-search') as GmpPlaceSearchElement;
       placeSearch.setAttribute('selectable', '');
-      
+
       const allContent = document.createElement('gmp-place-all-content');
-      nearbyRequest = document.createElement('gmp-place-nearby-search-request');
-      
+      nearbyRequest = document.createElement('gmp-place-nearby-search-request') as GmpNearbyRequestElement;
+
       placeSearch.appendChild(allContent);
       placeSearch.appendChild(nearbyRequest);
-      
+
       placeSearchRef.current.appendChild(placeSearch);
 
       const handleLoad = () => {
-        const newPlaces = (placeSearch as any).places || [];
+        const newPlaces = (placeSearch as GmpPlaceSearchElement).places || [];
         setPlaces(newPlaces);
       };
 
-      const handleSelect = (event: any) => {
-          const place = event.place;
+      const handleSelect = (event: Event) => {
+          const place = (event as GmpSelectEvent).place;
           setSelectedPlace(place);
           if (place?.location && map) {
-              panToWithOffset(place.location);
+              panToWithOffset(place.location as google.maps.LatLngLiteral);
           }
           // Auto-close sidebar on mobile after selection
           if (window.innerWidth < 640) {
@@ -142,7 +167,7 @@ const PlacesSearch = ({
       placeSearch.addEventListener('gmp-load', handleLoad);
       placeSearch.addEventListener('gmp-select', handleSelect);
     } else {
-      nearbyRequest = placeSearch.querySelector('gmp-place-nearby-search-request');
+      nearbyRequest = placeSearch.querySelector('gmp-place-nearby-search-request') as GmpNearbyRequestElement | null;
     }
     
     placeSearch.setAttribute('style', `color-scheme: ${isDarkMode ? 'dark' : 'light'}`);
@@ -380,13 +405,13 @@ const PlacesSearch = ({
                     initial={{ opacity: 0, scale: 0.95 }}
                     animate={{ opacity: 1, scale: 1 }}
                     exit={{ opacity: 0, scale: 0.95 }}
-                    key={place.id || place.name} 
+                    key={place.id}
                     className="group rounded-xl border transition-all relative overflow-hidden bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 hover:border-indigo-300 dark:hover:border-indigo-500 shadow-sm hover:shadow-md"
                   >
-                    <button 
+                    <button
                       onClick={(e) => {
                         e.stopPropagation();
-                        removeFromItinerary(place.id || place.name);
+                        removeFromItinerary(place.id);
                       }}
                       className="absolute top-2 right-2 p-1.5 transition-all rounded-md z-10 backdrop-blur-sm shadow-sm bg-white/80 dark:bg-slate-800/80 text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/30"
                       aria-label={`Remove ${place.displayName} from itinerary`}
@@ -399,7 +424,7 @@ const PlacesSearch = ({
                       className="cursor-pointer p-2 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"
                       onClick={() => {
                         if (place.location && map) {
-                          panToWithOffset(place.location);
+                          panToWithOffset(place.location as google.maps.LatLngLiteral);
                           setSelectedPlace(place);
                           // Auto-close sidebar on mobile after selection
                           if (window.innerWidth < 640) {
@@ -408,18 +433,15 @@ const PlacesSearch = ({
                         }
                       }}
                     >
-                      {/* @ts-ignore */}
                       <gmp-place-details-compact
                           internal-usage-attribution-ids="gmp_mcp_codeassist_v1_aistudio,ais_demo_api_key_applet_x7b2c9d4e1"
                           className="saved-list-item"
                           orientation="HORIZONTAL"
                           style={{ colorScheme: isDarkMode ? 'dark' : 'light' }}
                       >
-                        {/* @ts-ignore */}
                         <gmp-place-details-place-request
-                          place={place.id || place.name}
+                          place={place.id}
                         ></gmp-place-details-place-request>
-                        {/* @ts-ignore */}
                         <gmp-place-all-content></gmp-place-all-content>
                       </gmp-place-details-compact>
                     </div>
@@ -437,11 +459,10 @@ const PlacesSearch = ({
               >
                 <button
                   onClick={() => {
-                    const waypoints = itinerary.map(p =>
-                      p.location
-                        ? `${p.location.lat},${p.location.lng}`
-                        : encodeURIComponent(typeof p.displayName === 'object' ? p.displayName.text : p.displayName || '')
-                    ).join('/');
+                    // ItineraryItem always has a lat/lng location
+                    const waypoints = itinerary
+                      .map(p => `${p.location.lat},${p.location.lng}`)
+                      .join('/');
                     window.open(`https://www.google.com/maps/dir/${waypoints}`, '_blank', 'noopener,noreferrer');
                   }}
                   className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-bold border border-indigo-200 dark:border-indigo-800 bg-indigo-50 dark:bg-indigo-950/30 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100 dark:hover:bg-indigo-950/60 transition-all active:scale-[0.98]"
@@ -452,9 +473,7 @@ const PlacesSearch = ({
                 </button>
                 <button
                   onClick={() => {
-                    const placeNames = itinerary.map(p =>
-                      typeof p.displayName === 'object' ? p.displayName.text : (p.displayName || p.id || 'Unknown')
-                    ).join(', ');
+                    const placeNames = itinerary.map(p => p.displayName || p.id).join(', ');
                     window.dispatchEvent(new CustomEvent('trigger-chat', {
                       detail: {
                         message: `Generate a detailed day-by-day travel itinerary for a trip visiting these places: ${placeNames}. Include best times to visit, estimated duration at each place, what to see and do, and practical travel tips between stops.`
@@ -476,9 +495,9 @@ const PlacesSearch = ({
       </motion.div>
     </>
   );
-};
+});
 
-const MapMarkers = ({
+const MapMarkers = memo(({
   places,
   selectedPlace,
   setSelectedPlace,
@@ -489,11 +508,11 @@ const MapMarkers = ({
   onShowVlogs,
   onShowCalendar,
 }: {
-  places: any[];
-  selectedPlace: any | null;
-  setSelectedPlace: (place: any | null) => void;
-  itinerary: any[];
-  addToItinerary: (place: any) => void;
+  places: GooglePlace[];
+  selectedPlace: GooglePlace | ItineraryItem | null;
+  setSelectedPlace: (place: GooglePlace | ItineraryItem | null) => void;
+  itinerary: ItineraryItem[];
+  addToItinerary: (place: GooglePlace | ItineraryItem) => void;
   isStreetViewActive: boolean;
   isDarkMode: boolean;
   onShowVlogs: () => void;
@@ -509,31 +528,31 @@ const MapMarkers = ({
 
   // Combine places from search and itinerary to ensure all are marked
   // We use a Map to avoid duplicates by ID
-  const allPlacesMap = new Map<string, any>();
-  
+  const allPlacesMap = new Map<string, GooglePlace | ItineraryItem>();
+
   // Add search results first
   places.forEach(p => {
-    const id = p.id || p.name;
+    const id = getPlaceKey(p);
     if (id) allPlacesMap.set(id, p);
   });
-  
-  // Add itinerary items (they might overwrite search results with their simplified versions, 
-  // but that's okay for markers, or we can prefer search results if they exist)
+
+  // Add itinerary items (prefer existing search results if already present)
   itinerary.forEach(p => {
-    const id = p.id || p.name;
+    const id = getPlaceKey(p);
     if (id && !allPlacesMap.has(id)) {
       allPlacesMap.set(id, p);
     }
   });
 
-  const allPlaces = Array.from(allPlacesMap.values()) as any[];
+  const allPlaces = Array.from(allPlacesMap.values());
 
   return (
     <>
       {/* Markers on Map */}
-      {allPlaces.map((place: any) => {
-        const isSelected = selectedPlace && (selectedPlace.id || selectedPlace.name) === (place.id || place.name);
-        const isInItinerary = itinerary.some(p => (p.id || p.name) === (place.id || place.name));
+      {allPlaces.map((place) => {
+        const placeK = getPlaceKey(place);
+        const isSelected = selectedPlace && getPlaceKey(selectedPlace) === placeK;
+        const isInItinerary = itinerary.some(p => p.id === placeK);
         
         // Color logic:
         // 1. Selected (Active) -> Rose
@@ -549,13 +568,13 @@ const MapMarkers = ({
         return (
           place.location && (
             <AdvancedMarker
-              key={place.id || place.name}
-              position={place.location}
-              title={typeof place.displayName === 'object' ? place.displayName.text : place.displayName}
+              key={placeK}
+              position={place.location as google.maps.LatLngLiteral}
+              title={typeof place.displayName === 'object' ? place.displayName.text : (place.displayName ?? '')}
               onClick={() => {
                 setSelectedPlace(place);
                 if (place.location && map) {
-                  panToWithOffset(place.location);
+                  panToWithOffset(place.location as google.maps.LatLngLiteral);
                 }
               }}
             >
@@ -568,43 +587,43 @@ const MapMarkers = ({
       })}
 
       {/* Place Details Popup */}
-      {selectedPlace && (selectedPlace.id || selectedPlace.name) && !isStreetViewActive && (
+      {selectedPlace && getPlaceKey(selectedPlace) && !isStreetViewActive && (
         <InfoWindow
-          position={selectedPlace.location}
+          position={selectedPlace.location as google.maps.LatLngLiteral}
           onCloseClick={() => setSelectedPlace(null)}
           pixelOffset={[0, -30]}
           disableAutoPan={false}
         >
+          {(() => {
+            const selKey = getPlaceKey(selectedPlace);
+            const isSaved = itinerary.some(p => p.id === selKey);
+            return (
           <div className="w-[320px] bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 font-sans" style={{maxWidth: "100%", colorScheme: isDarkMode ? 'dark' : 'light'}}>
-             {/* @ts-ignore */}
             <gmp-place-details-compact
-                key={selectedPlace.id || selectedPlace.name}
                 internal-usage-attribution-ids="gmp_mcp_codeassist_v1_aistudio,ais_demo_api_key_applet_x7b2c9d4e1"
                 className="info-window-compact"
                 style={{ colorScheme: isDarkMode ? 'dark' : 'light' }}
             >
-              {/* @ts-ignore */}
               <gmp-place-details-place-request
-                place={selectedPlace.id || selectedPlace.name}
+                place={selKey}
               ></gmp-place-details-place-request>
-              {/* @ts-ignore */}
               <gmp-place-all-content></gmp-place-all-content>
             </gmp-place-details-compact>
-            
+
             <div className="p-3 bg-slate-50/50 dark:bg-slate-800/30 border-t border-slate-100 dark:border-slate-800">
               <div className="flex gap-2">
                 {/* Save button */}
                 <button
                   onClick={() => addToItinerary(selectedPlace)}
-                  disabled={itinerary.some(p => (p.id || p.name) === (selectedPlace.id || selectedPlace.name))}
+                  disabled={isSaved}
                   className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl font-bold text-xs transition-all shadow-md ${
-                    itinerary.some(p => (p.id || p.name) === (selectedPlace.id || selectedPlace.name))
+                    isSaved
                       ? 'bg-amber-500 text-white cursor-default shadow-amber-200/50 dark:shadow-none'
                       : 'bg-amber-500 text-white hover:bg-amber-600 active:scale-95 shadow-amber-200/50 dark:shadow-none'
                   }`}
                 >
-                  <Star className={`w-3.5 h-3.5 ${itinerary.some(p => (p.id || p.name) === (selectedPlace.id || selectedPlace.name)) ? 'fill-current' : ''}`} />
-                  {itinerary.some(p => (p.id || p.name) === (selectedPlace.id || selectedPlace.name)) ? 'Saved' : 'Save'}
+                  <Star className={`w-3.5 h-3.5 ${isSaved ? 'fill-current' : ''}`} />
+                  {isSaved ? 'Saved' : 'Save'}
                 </button>
 
                 {/* Vlogs button */}
@@ -631,11 +650,13 @@ const MapMarkers = ({
               </div>
             </div>
           </div>
+            );
+          })()}
         </InfoWindow>
       )}
     </>
   );
-};
+});
 
 const StreetViewObserver = ({ setIsStreetViewActive }: { setIsStreetViewActive: (active: boolean) => void }) => {
   const map = useMap();
@@ -651,10 +672,10 @@ const StreetViewObserver = ({ setIsStreetViewActive }: { setIsStreetViewActive: 
 };
 
 export default function MapComponent({ apiKey, isDarkMode, setIsDarkMode }: MapComponentProps) {
-  const [places, setPlaces] = useState<any[]>([]);
-  const [selectedPlace, setSelectedPlace] = useState<any | null>(null);
+  const [places, setPlaces] = useState<GooglePlace[]>([]);
+  const [selectedPlace, setSelectedPlace] = useState<GooglePlace | ItineraryItem | null>(null);
   const [selectedType, setSelectedType] = useState('tourist_attraction');
-  const [itinerary, setItinerary] = useState<any[]>([]);
+  const [itinerary, setItinerary] = useState<ItineraryItem[]>([]);
   const [activeTab, setActiveTab] = useState<'search' | 'saved'>('search');
   const [citySearch, setCitySearch] = useState('');
   const [isStreetViewActive, setIsStreetViewActive] = useState(false);
@@ -683,10 +704,8 @@ export default function MapComponent({ apiKey, isDarkMode, setIsDarkMode }: MapC
   const [mapCenter, setMapCenter] = useState({ lat: 48.8566, lng: 2.3522 });
   const [mapZoom, setMapZoom] = useState(13);
 
-  const handleCitySelect = (map: any, cityName: string) => {
-    if (!map) {
-      return
-    }
+  const handleCitySelect = useCallback((map: google.maps.Map | null, cityName: string) => {
+    if (!map) return;
     const city = POPULAR_CITIES.find(c => c.name === cityName);
     if (city) {
       map.setCenter({ lat: city.lat, lng: city.lng });
@@ -694,17 +713,20 @@ export default function MapComponent({ apiKey, isDarkMode, setIsDarkMode }: MapC
       setSelectedPlace(null);
       setCitySearch(cityName);
     }
-  };
+  }, []);
 
-  const addToItinerary = (place: any) => {
+  const addToItinerary = useCallback((place: GooglePlace | ItineraryItem) => {
     if (!place) return;
-    const placeId = place.id || place.name || (place.place_id);
+    const rawName = 'name' in place ? place.name : undefined;
+    const placeId = place.id || rawName || ('place_id' in place ? place.place_id : undefined);
     if (!placeId) return;
 
-    if (!itinerary.find(p => (p.id || p.name) === placeId)) {
-      // Create a simplified object for the itinerary to ensure persistence
-      const name = typeof place.displayName === 'object' ? place.displayName.text : (place.displayName || place.name || 'Selected Place');
-      const address = place.formattedAddress || place.vicinity || '';
+    if (!itinerary.find(p => p.id === placeId)) {
+      // Create a simplified serialisable object for the itinerary
+      const name = typeof place.displayName === 'object'
+        ? place.displayName.text
+        : (place.displayName || rawName || 'Selected Place');
+      const address = place.formattedAddress || ('vicinity' in place ? place.vicinity : '') || '';
       
       let lat = 0;
       let lng = 0;
@@ -713,20 +735,20 @@ export default function MapComponent({ apiKey, isDarkMode, setIsDarkMode }: MapC
         lng = typeof place.location.lng === 'function' ? place.location.lng() : place.location.lng;
       }
 
-      const itineraryItem = {
+      const itineraryItem: ItineraryItem = {
         id: placeId,
         displayName: name,
         formattedAddress: address,
         location: { lat, lng }
       };
-      setItinerary([...itinerary, itineraryItem]);
+      setItinerary(prev => [...prev, itineraryItem]);
       setActiveTab('saved');
     }
-  };
+  }, [itinerary]);
 
-  const removeFromItinerary = (placeId: string) => {
-    setItinerary(itinerary.filter(p => (p.id || p.name) !== placeId));
-  };
+  const removeFromItinerary = useCallback((placeId: string) => {
+    setItinerary(prev => prev.filter(p => p.id !== placeId));
+  }, []);
 
   return (
     <div className="w-full h-full relative overflow-hidden font-sans">
@@ -752,7 +774,6 @@ export default function MapComponent({ apiKey, isDarkMode, setIsDarkMode }: MapC
           className="w-full h-full"
           disableDefaultUI={false}
           mapTypeControl={false}
-          internalUsageAttributionIds={['gmp_mcp_codeassist_v1_aistudio', 'ais_demo_api_key_applet_x7b2c9d4e1']}
           clickableIcons={false}
         >
           <StreetViewObserver setIsStreetViewActive={setIsStreetViewActive} />

@@ -3,118 +3,35 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useEffect, useState } from 'react';
-import AboutModal from './components/AboutModal';
-import MapComponent from './components/MapComponent';
-import ChatPanel from './components/ChatPanel';
+import React, { Suspense, lazy } from 'react';
 import { Loader2, Info } from 'lucide-react';
+import ErrorBoundary from './components/ErrorBoundary';
+import { useDarkMode } from './hooks/useDarkMode';
+import { useApiKey } from './hooks/useApiKey';
+
+// Lazy-load heavy components so the initial bundle stays small.
+// Each chunk is split by Vite's manualChunks config.
+const MapComponent = lazy(() => import('./components/MapComponent'));
+const ChatPanel = lazy(() => import('./components/ChatPanel'));
+const AboutModal = lazy(() => import('./components/AboutModal'));
+
+function SuspenseFallback() {
+  return (
+    <div
+      role="status"
+      aria-label="Loading"
+      className="min-h-screen flex items-center justify-center bg-white dark:bg-slate-950"
+    >
+      <Loader2 className="w-8 h-8 animate-spin text-indigo-600 dark:text-indigo-400" aria-hidden="true" />
+      <span className="sr-only">Loading…</span>
+    </div>
+  );
+}
 
 export default function App() {
-  const [apiKey, setApiKey] = useState<string | null>(null);
-  const [checking, setChecking] = useState(true);
-  const [isDarkMode, setIsDarkMode] = useState(false);
-  const [themeOverridden, setThemeOverridden] = useState(false);
-  const [showAboutModal, setShowAboutModal] = useState(false);
-
-  useEffect(() => {
-    checkApiKey();
-    
-    // Initialize theme from system preference
-    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-    setIsDarkMode(mediaQuery.matches);
-    
-    const handler = (e: MediaQueryListEvent) => setIsDarkMode(e.matches);
-    // const handler = (e: MediaQueryListEvent) => {
-    //   // Only follow system if the user hasn't manually toggled the theme
-    //   setThemeOverridden(prev => {
-    //     if (!prev) {
-    //       setIsDarkMode(e.matches);
-    //     }
-    //     return prev;
-    //   });
-    // };
-    
-    mediaQuery.addEventListener('change', handler);
-    return () => mediaQuery.removeEventListener('change', handler);
-  }, []);
-
-  const handleSetDarkMode = (isDark: boolean) => {
-    setIsDarkMode(isDark);
-    setThemeOverridden(true);
-  };
-
-  useEffect(() => {
-    if (isDarkMode) {
-      document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-    }
-  }, [isDarkMode]);
-
-  const checkApiKey = async () => {
-    try {
-      const res = await fetch('/api/config');
-      const data = await res.json();
-      if (data.apiKey) {
-        setApiKey(data.apiKey);
-        return true;
-      }
-    } catch (error) {
-      console.error('Error checking API key:', error);
-    } finally {
-      setChecking(false);
-    }
-    return false;
-  };
-
-  // Polling for API key if not present
-  useEffect(() => {
-    if (apiKey || checking) return;
-
-    const interval = setInterval(async () => {
-      const found = await checkApiKey();
-      if (found) {
-        clearInterval(interval);
-      }
-    }, 3000); // Check every 3 seconds
-
-    return () => clearInterval(interval);
-  }, [apiKey, checking]);
-
-  const handleApiKeySubmit = async (key: string) => {
-    const res = await fetch('/api/config', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ apiKey: key }),
-    });
-
-    if (res.ok) {
-      setApiKey(key);
-    } else {
-      throw new Error('Failed to save key');
-    }
-  };
-
-  const handleResetKey = async () => {
-    await fetch('/api/config', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ apiKey: '' }),
-    });
-    setApiKey(null);
-  };
-
-  useEffect(() => {
-    if (!apiKey) return;
-    
-    // Places UI Kit components often look for a script tag with a key to initialize.
-    // When using dynamic loaders, we can help them by ensuring a script tag exists or 
-    // by setting the key in a way they can find.
-    const existingScript = document.querySelector('script[src*="maps.googleapis.com"]');
-    if (existingScript && !existingScript.hasAttribute('key')) {
-      existingScript.setAttribute('key', apiKey);
-    }
-  }, [apiKey]);
+  const { isDarkMode, setDarkMode } = useDarkMode();
+  const { apiKey, checking, resetApiKey } = useApiKey();
+  const [showAboutModal, setShowAboutModal] = React.useState(false);
 
   if (checking) {
     return (
@@ -130,7 +47,7 @@ export default function App() {
   }
 
   return (
-    <>
+    <ErrorBoundary>
       <a
         href="#main-content"
         className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-[9999] focus:px-4 focus:py-2 focus:bg-indigo-600 focus:text-white focus:rounded-lg focus:font-bold"
@@ -139,20 +56,26 @@ export default function App() {
       </a>
 
       <div className="flex flex-col h-screen bg-white dark:bg-slate-950 transition-colors duration-500">
-        <AboutModal
-          isOpen={showAboutModal}
-          onClose={() => setShowAboutModal(false)}
-        />
+        <Suspense fallback={null}>
+          <AboutModal
+            isOpen={showAboutModal}
+            onClose={() => setShowAboutModal(false)}
+          />
+        </Suspense>
 
-        <ChatPanel />
+        <Suspense fallback={null}>
+          <ChatPanel />
+        </Suspense>
 
         <main id="main-content" className="flex-1 relative" aria-label="Travel Planner Map">
           {apiKey ? (
-            <MapComponent
-              apiKey={apiKey}
-              isDarkMode={isDarkMode}
-              setIsDarkMode={handleSetDarkMode}
-            />
+            <Suspense fallback={<SuspenseFallback />}>
+              <MapComponent
+                apiKey={apiKey}
+                isDarkMode={isDarkMode}
+                setIsDarkMode={setDarkMode}
+              />
+            </Suspense>
           ) : !showAboutModal ? (
             <div className="absolute inset-0 flex flex-col items-center justify-center p-8 text-center bg-slate-50 dark:bg-slate-950">
               <div className="max-w-md space-y-6">
@@ -182,7 +105,6 @@ export default function App() {
           )}
         </main>
       </div>
-    </>
+    </ErrorBoundary>
   );
 }
-
